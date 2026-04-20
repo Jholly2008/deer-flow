@@ -160,6 +160,49 @@ def test_build_middlewares_uses_resolved_model_name_for_vision(monkeypatch):
     assert len(middlewares) > 0 and isinstance(middlewares[-2], MagicMock)
 
 
+def test_make_lead_agent_enables_secops_runtime_hooks(monkeypatch):
+    app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
+
+    import deerflow.tools as tools_module
+    from deerflow.config.agents_config import AgentConfig
+
+    captured_tools_kwargs: dict[str, object] = {}
+    captured_middlewares: dict[str, object] = {}
+
+    monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: app_config)
+    monkeypatch.setattr(lead_agent_module, "load_agent_config", lambda name: AgentConfig(name=name))
+    monkeypatch.setattr(
+        tools_module,
+        "get_available_tools",
+        lambda **kwargs: captured_tools_kwargs.update(kwargs) or [],
+    )
+
+    def _fake_build_middlewares(config, model_name, agent_name=None, custom_middlewares=None):
+        captured_middlewares["agent_name"] = agent_name
+        captured_middlewares["custom_middlewares"] = custom_middlewares or []
+        return []
+
+    monkeypatch.setattr(lead_agent_module, "_build_middlewares", _fake_build_middlewares)
+    monkeypatch.setattr(lead_agent_module, "create_chat_model", lambda **kwargs: object())
+    monkeypatch.setattr(lead_agent_module, "create_agent", lambda **kwargs: kwargs)
+
+    lead_agent_module.make_lead_agent(
+        {
+            "configurable": {
+                "model_name": "safe-model",
+                "thinking_enabled": False,
+                "is_plan_mode": False,
+                "subagent_enabled": False,
+                "agent_name": "secops-agent",
+            }
+        }
+    )
+
+    assert captured_tools_kwargs["agent_name"] == "secops-agent"
+    assert captured_middlewares["agent_name"] == "secops-agent"
+    assert any(type(m).__name__ == "SecOpsAlertContextMiddleware" for m in captured_middlewares["custom_middlewares"])
+
+
 def test_create_summarization_middleware_uses_configured_model_alias(monkeypatch):
     monkeypatch.setattr(
         lead_agent_module,

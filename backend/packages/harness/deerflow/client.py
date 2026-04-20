@@ -250,12 +250,11 @@ class DeerFlowClient:
         self._agent_config_key = key
         logger.info("Agent created: agent_name=%s, model=%s, thinking=%s", self._agent_name, model_name, thinking_enabled)
 
-    @staticmethod
-    def _get_tools(*, model_name: str | None, subagent_enabled: bool):
+    def _get_tools(self, *, model_name: str | None, subagent_enabled: bool):
         """Lazy import to avoid circular dependency at module level."""
         from deerflow.tools import get_available_tools
 
-        return get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled)
+        return get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled, agent_name=self._agent_name)
 
     @staticmethod
     def _serialize_tool_calls(tool_calls) -> list[dict]:

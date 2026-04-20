@@ -9,6 +9,7 @@ from deerflow.agents.memory.summarization_hook import memory_flush_hook
 from deerflow.agents.middlewares.clarification_middleware import ClarificationMiddleware
 from deerflow.agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware
 from deerflow.agents.middlewares.memory_middleware import MemoryMiddleware
+from deerflow.agents.middlewares.secops_alert_context_middleware import SECOPS_AGENT_NAME, SecOpsAlertContextMiddleware
 from deerflow.agents.middlewares.subagent_limit_middleware import SubagentLimitMiddleware
 from deerflow.agents.middlewares.summarization_middleware import BeforeSummarizationHook, DeerFlowSummarizationMiddleware
 from deerflow.agents.middlewares.title_middleware import TitleMiddleware
@@ -24,6 +25,13 @@ from deerflow.config.summarization_config import get_summarization_config
 from deerflow.models import create_chat_model
 
 logger = logging.getLogger(__name__)
+
+
+def _build_agent_specific_middlewares(agent_name: str | None) -> list[AgentMiddleware]:
+    middlewares: list[AgentMiddleware] = []
+    if agent_name == SECOPS_AGENT_NAME:
+        middlewares.append(SecOpsAlertContextMiddleware())
+    return middlewares
 
 
 def _resolve_model_name(requested_model_name: str | None = None) -> str:
@@ -347,10 +355,11 @@ def make_lead_agent(config: RunnableConfig):
         )
 
     # Default lead agent (unchanged behavior)
+    custom_middlewares = _build_agent_specific_middlewares(agent_name)
     return create_agent(
         model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort),
-        tools=get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),
-        middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name),
+        tools=get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled, agent_name=agent_name),
+        middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name, custom_middlewares=custom_middlewares),
         system_prompt=apply_prompt_template(
             subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents, agent_name=agent_name, available_skills=set(agent_config.skills) if agent_config and agent_config.skills is not None else None
         ),

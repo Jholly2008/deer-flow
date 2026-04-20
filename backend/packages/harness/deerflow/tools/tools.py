@@ -5,14 +5,20 @@ from langchain.tools import BaseTool
 from deerflow.config import get_app_config
 from deerflow.reflection import resolve_variable
 from deerflow.sandbox.security import is_host_bash_allowed
-from deerflow.tools.builtins import ask_clarification_tool, present_file_tool, task_tool, view_image_tool
+from deerflow.tools.builtins import ask_clarification_tool, get_alert_workspace_context_tool, present_file_tool, task_tool, view_image_tool
 from deerflow.tools.builtins.tool_search import reset_deferred_registry
 
 logger = logging.getLogger(__name__)
 
+SECOPS_AGENT_NAME = "secops-agent"
+
 BUILTIN_TOOLS = [
     present_file_tool,
     ask_clarification_tool,
+]
+
+SECOPS_AGENT_TOOLS = [
+    get_alert_workspace_context_tool,
 ]
 
 SUBAGENT_TOOLS = [
@@ -37,6 +43,7 @@ def get_available_tools(
     include_mcp: bool = True,
     model_name: str | None = None,
     subagent_enabled: bool = False,
+    agent_name: str | None = None,
 ) -> list[BaseTool]:
     """Get all available tools from config.
 
@@ -63,6 +70,9 @@ def get_available_tools(
 
     # Conditionally add tools based on config
     builtin_tools = BUILTIN_TOOLS.copy()
+    if agent_name == SECOPS_AGENT_NAME:
+        builtin_tools.extend(SECOPS_AGENT_TOOLS)
+
     skill_evolution_config = getattr(config, "skill_evolution", None)
     if getattr(skill_evolution_config, "enabled", False):
         from deerflow.tools.skill_manage_tool import skill_manage_tool
