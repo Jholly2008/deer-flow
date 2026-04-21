@@ -66,21 +66,6 @@ def _normalize_alert(alert: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def _normalize_execution(record: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(record)
-    for key in ("params", "externalPayload", "executionPlan", "executionReport", "logs"):
-        normalized[key] = _parse_jsonish(normalized.get(key))
-    return normalized
-
-
-def _get_latest_non_empty(records: list[dict[str, Any]], field: str) -> Any:
-    for record in records:
-        value = record.get(field)
-        if value not in (None, "", [], {}):
-            return value
-    return None
-
-
 def _format_http_error(prefix: str, error: Exception) -> str:
     if isinstance(error, httpx.HTTPStatusError):
         response = error.response
@@ -91,35 +76,16 @@ def _format_http_error(prefix: str, error: Exception) -> str:
 def fetch_alert_workspace_context(alert_id: str, *, base_url: str | None = None, timeout: float = DEFAULT_HTTP_TIMEOUT_SECONDS) -> dict[str, Any]:
     resolved_base_url = (base_url or _resolve_biz_service_base_url()).rstrip("/")
     alert_url = f"{resolved_base_url}/api/biz/alerts/{alert_id}"
-    executions_url = f"{resolved_base_url}/api/biz/executions"
 
     with httpx.Client(timeout=timeout) as client:
         alert_response = client.get(alert_url)
         alert_response.raise_for_status()
         alert = _normalize_alert(alert_response.json())
 
-        execution_load_error = None
-        recent_executions: list[dict[str, Any]] = []
-        try:
-            executions_response = client.get(executions_url)
-            executions_response.raise_for_status()
-            recent_executions = [
-                _normalize_execution(record)
-                for record in executions_response.json()
-                if str(record.get("alertId")) == str(alert_id)
-            ]
-        except Exception as error:  # noqa: BLE001
-            execution_load_error = _format_http_error("Failed to load execution records", error)
-
     return {
         "ok": True,
         "alertId": str(alert_id),
         "alert": alert,
-        "recentExecutions": recent_executions,
-        "executionCount": len(recent_executions),
-        "latestExecutionPlan": _get_latest_non_empty(recent_executions, "executionPlan"),
-        "latestExecutionReport": _get_latest_non_empty(recent_executions, "executionReport"),
-        "executionLoadError": execution_load_error,
     }
 
 
@@ -131,8 +97,7 @@ def get_alert_workspace_context_tool(
     """Load the authoritative alert workspace context from SecOps biz-service.
 
     Use this tool when you need the latest persisted business data for the active alert.
-    It returns the alert detail, parsed AI analysis/default params, recent execution records,
-    and the latest persisted execution plan/report when available.
+    It returns the alert detail, including parsed AI analysis and default params.
 
     Args:
         alert_id: Optional alert ID. If omitted, the tool uses the alert bound to the current thread context.

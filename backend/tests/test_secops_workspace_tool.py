@@ -62,7 +62,6 @@ def _run_tool(**kwargs):
 def test_workspace_tool_uses_runtime_alert_id_and_aggregates_context(monkeypatch):
     base_url = "http://biz-service.local"
     alert_id = "1017"
-    executions_url = f"{base_url}/api/biz/executions"
     alert_url = f"{base_url}/api/biz/alerts/{alert_id}"
 
     fake_client = _FakeClient(
@@ -76,21 +75,6 @@ def test_workspace_tool_uses_runtime_alert_id_and_aggregates_context(monkeypatch
                 },
                 url=alert_url,
             ),
-            executions_url: _FakeResponse(
-                [
-                    {
-                        "alertId": alert_id,
-                        "executionPlan": '{"steps":["block IP"]}',
-                        "executionReport": "Blocked attacker IP",
-                        "params": '{"sourceIp":"45.155.205.233"}',
-                    },
-                    {
-                        "alertId": "1001",
-                        "executionPlan": "ignore other alert",
-                    },
-                ],
-                url=executions_url,
-            ),
         }
     )
 
@@ -103,20 +87,15 @@ def test_workspace_tool_uses_runtime_alert_id_and_aggregates_context(monkeypatch
     assert result["alertId"] == alert_id
     assert result["alert"]["aiAnalysis"]["summary"] == "Brute force confirmed"
     assert result["alert"]["defaultParams"]["host"] == "10.0.0.25"
-    assert len(result["recentExecutions"]) == 1
-    assert result["recentExecutions"][0]["params"]["sourceIp"] == "45.155.205.233"
-    assert result["latestExecutionPlan"]["steps"] == ["block IP"]
-    assert result["latestExecutionReport"] == "Blocked attacker IP"
+    assert fake_client.requested_urls == [alert_url]
 
 
 def test_workspace_tool_prefers_explicit_alert_id(monkeypatch):
     base_url = "http://biz-service.local"
     alert_url = f"{base_url}/api/biz/alerts/2001"
-    executions_url = f"{base_url}/api/biz/executions"
     fake_client = _FakeClient(
         {
             alert_url: _FakeResponse({"id": "2001", "type": "Phishing"}, url=alert_url),
-            executions_url: _FakeResponse([], url=executions_url),
         }
     )
 
@@ -134,28 +113,6 @@ def test_workspace_tool_returns_error_when_alert_id_missing():
 
     assert result["ok"] is False
     assert "alert_id" in result["error"]
-
-
-def test_workspace_tool_returns_partial_success_when_execution_query_fails(monkeypatch):
-    base_url = "http://biz-service.local"
-    alert_id = "1017"
-    alert_url = f"{base_url}/api/biz/alerts/{alert_id}"
-    executions_url = f"{base_url}/api/biz/executions"
-    fake_client = _FakeClient(
-        {
-            alert_url: _FakeResponse({"id": alert_id, "type": "Malware"}, url=alert_url),
-            executions_url: _FakeResponse([], url=executions_url, status_code=503),
-        }
-    )
-
-    monkeypatch.setattr(workspace_tool_module, "_resolve_biz_service_base_url", lambda: base_url)
-    monkeypatch.setattr(workspace_tool_module.httpx, "Client", lambda timeout: fake_client)
-
-    result = _run_tool(runtime=_runtime(alert_id=alert_id), alert_id=None)
-
-    assert result["ok"] is True
-    assert result["executionLoadError"] is not None
-    assert result["recentExecutions"] == []
 
 
 def test_resolve_biz_service_base_url_prefers_docker_host_inside_container(monkeypatch):

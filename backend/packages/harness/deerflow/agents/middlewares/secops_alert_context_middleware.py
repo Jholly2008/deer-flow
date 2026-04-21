@@ -57,7 +57,7 @@ def _format_alert_context_message(context: dict[str, Any]) -> str:
         "Alert snapshot:",
         snapshot_text,
         "",
-        "If you need the latest persisted alert details or execution records, call `get_alert_workspace_context`.",
+        "If you need the latest persisted alert details from the backend, call `get_alert_workspace_context`.",
         "</secops_alert_context>",
     ]
     return "\n".join(lines)
