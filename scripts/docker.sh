@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -e
 
+set_terminal_title() {
+    if [ -t 1 ]; then
+        printf '\033]0;%s\007' "$1"
+    fi
+}
+
+set_terminal_title "deer-flow - SecOpsCopilot"
+
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'

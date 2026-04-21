@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+set_terminal_title() {
+    if [ -t 1 ]; then
+        printf '\033]0;%s\007' "$1"
+    fi
+}
+
+set_terminal_title "deer-flow - SecOpsCopilot"
+
 #
 # serve.sh — Unified DeerFlow service launcher
 #
