@@ -113,6 +113,37 @@ def test_before_model_uses_configurable_fallback_when_runtime_context_missing():
     assert "Malware beaconing" in injected.content
 
 
+@pytest.mark.parametrize(
+    ("ui_language", "expected_instruction"),
+    [
+        ("zh-CN", "Respond to the operator in Simplified Chinese."),
+        ("en", "Respond to the operator in English."),
+    ],
+)
+def test_before_model_injects_ui_language_instruction(
+    ui_language: str,
+    expected_instruction: str,
+):
+    middleware = SecOpsAlertContextMiddleware()
+    state = {"messages": [HumanMessage(content="Investigate")]}
+
+    result = middleware.before_model(
+        state,
+        _runtime(
+            context={
+                "agent_name": SECOPS_AGENT_NAME,
+                "alert_id": "1017",
+                "alert_title": "Brute force attack",
+                "ui_language": ui_language,
+            }
+        ),
+    )
+
+    assert result is not None
+    injected = result["messages"][0]
+    assert expected_instruction in injected.content
+
+
 @pytest.mark.anyio
 async def test_abefore_model_matches_sync_behavior():
     middleware = SecOpsAlertContextMiddleware()

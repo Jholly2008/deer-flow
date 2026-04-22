@@ -36,11 +36,24 @@ def _normalize_alert_snapshot(snapshot: Any) -> Any:
     return snapshot
 
 
+def _resolve_ui_language_instruction(raw_language: Any) -> str | None:
+    if not isinstance(raw_language, str):
+        return None
+
+    normalized = raw_language.strip().lower()
+    if normalized in {"zh", "zh-cn"}:
+        return "Respond to the operator in Simplified Chinese."
+    if normalized in {"en", "en-us", "en-gb"}:
+        return "Respond to the operator in English."
+    return None
+
+
 def _format_alert_context_message(context: dict[str, Any]) -> str:
     alert_snapshot = _normalize_alert_snapshot(context.get("alert_snapshot"))
     snapshot_text = "null"
     if alert_snapshot is not None:
         snapshot_text = json.dumps(alert_snapshot, indent=2, ensure_ascii=False, sort_keys=True)
+    language_instruction = _resolve_ui_language_instruction(context.get("ui_language"))
 
     lines = [
         "<secops_alert_context>",
@@ -54,12 +67,26 @@ def _format_alert_context_message(context: dict[str, Any]) -> str:
         f"- alert_severity: {context.get('alert_severity') or 'unknown'}",
         f"- operator: {context.get('user_display_name') or context.get('user_name') or 'unknown'}",
         "",
+    ]
+
+    if language_instruction:
+        lines.extend(
+            [
+                "Workspace language preference:",
+                f"- {language_instruction}",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
         "Alert snapshot:",
         snapshot_text,
         "",
         "If you need the latest persisted alert details from the backend, call `get_alert_workspace_context`.",
         "</secops_alert_context>",
-    ]
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -77,6 +104,7 @@ class SecOpsAlertContextMiddleware(AgentMiddleware):
             "alert_severity": _resolve_runtime_value(runtime, "alert_severity"),
             "user_name": _resolve_runtime_value(runtime, "user_name"),
             "user_display_name": _resolve_runtime_value(runtime, "user_display_name"),
+            "ui_language": _resolve_runtime_value(runtime, "ui_language"),
             "alert_snapshot": _resolve_runtime_value(runtime, "alert_snapshot"),
         }
 
