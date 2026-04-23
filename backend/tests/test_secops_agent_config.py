@@ -21,6 +21,8 @@ def test_mock_illegal_login_skill_documents_required_sop():
         "test",
         "get_alert_workspace_context",
         "get_mock_auth_user_context",
+        "sourceIp",
+        "commonIp",
         "update_alert_status",
         "kick_mock_auth_user_sessions",
         "disable_mock_auth_user",

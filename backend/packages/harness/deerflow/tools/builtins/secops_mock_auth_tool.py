@@ -87,6 +87,7 @@ def get_mock_auth_user_context(username: str) -> dict[str, Any]:
             "username": username,
             "userExists": user is not None,
             "disabled": bool(user.get("disabled")) if user else False,
+            "commonIp": str(user.get("commonIp") or "") if user else "",
             "sessions": active_sessions,
         }
     except Exception as error:  # noqa: BLE001

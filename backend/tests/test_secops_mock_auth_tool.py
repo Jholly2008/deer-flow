@@ -60,7 +60,11 @@ def test_get_mock_auth_user_context_returns_user_and_sessions(monkeypatch):
     fake_client = _FakeClient(
         {
             ("POST", login_url): _FakeResponse({"token": "mock-token"}, method="POST", url=login_url),
-            ("GET", users_url): _FakeResponse({"users": [{"username": "test", "disabled": False}]}, method="GET", url=users_url),
+            ("GET", users_url): _FakeResponse(
+                {"users": [{"username": "test", "disabled": False, "commonIp": "172.16.8.1"}]},
+                method="GET",
+                url=users_url,
+            ),
             ("GET", sessions_url): _FakeResponse(
                 {"sessions": [{"sessionId": "session-1", "username": "test"}]},
                 method="GET",
@@ -77,6 +81,7 @@ def test_get_mock_auth_user_context_returns_user_and_sessions(monkeypatch):
     assert result["ok"] is True
     assert result["userExists"] is True
     assert result["disabled"] is False
+    assert result["commonIp"] == "172.16.8.1"
     assert result["sessions"] == [{"sessionId": "session-1", "username": "test"}]
 
 
