@@ -5,7 +5,17 @@ from langchain.tools import BaseTool
 from deerflow.config import get_app_config
 from deerflow.reflection import resolve_variable
 from deerflow.sandbox.security import is_host_bash_allowed
-from deerflow.tools.builtins import ask_clarification_tool, get_alert_workspace_context_tool, present_file_tool, task_tool, view_image_tool
+from deerflow.tools.builtins import (
+    ask_clarification_tool,
+    disable_mock_auth_user,
+    get_alert_workspace_context_tool,
+    get_mock_auth_user_context,
+    kick_mock_auth_user_sessions,
+    present_file_tool,
+    task_tool,
+    update_alert_status_tool,
+    view_image_tool,
+)
 from deerflow.tools.builtins.tool_search import reset_deferred_registry
 
 logger = logging.getLogger(__name__)
@@ -19,6 +29,10 @@ BUILTIN_TOOLS = [
 
 SECOPS_AGENT_TOOLS = [
     get_alert_workspace_context_tool,
+    update_alert_status_tool,
+    get_mock_auth_user_context,
+    kick_mock_auth_user_sessions,
+    disable_mock_auth_user,
 ]
 
 SUBAGENT_TOOLS = [

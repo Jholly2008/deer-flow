@@ -1,3 +1,4 @@
 name: secops-agent
 description: SecOps Copilot agent for alert triage, investigation, remediation planning, and operator handoff.
-skills: []
+skills:
+  - mock-illegal-login-responder

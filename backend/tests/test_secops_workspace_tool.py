@@ -59,22 +59,20 @@ def _run_tool(**kwargs):
     return workspace_tool_module.get_alert_workspace_context_tool.func(**kwargs)
 
 
-def test_workspace_tool_uses_runtime_alert_id_and_aggregates_context(monkeypatch):
+def test_workspace_tool_uses_runtime_alert_id_and_returns_raw_alert_payload(monkeypatch):
     base_url = "http://biz-service.local"
-    alert_id = "1017"
+    alert_id = "1019"
     alert_url = f"{base_url}/api/biz/alerts/{alert_id}"
+    payload = {
+        "id": alert_id,
+        "type": "mock-user-illegal-login",
+        "status": "pending",
+        "hasAiAnalysis": False,
+    }
 
     fake_client = _FakeClient(
         {
-            alert_url: _FakeResponse(
-                {
-                    "id": alert_id,
-                    "type": "Brute force attack",
-                    "aiAnalysis": '{"summary":"Brute force confirmed"}',
-                    "defaultParams": '{"host":"10.0.0.25"}',
-                },
-                url=alert_url,
-            ),
+            alert_url: _FakeResponse(payload, url=alert_url),
         }
     )
 
@@ -85,8 +83,7 @@ def test_workspace_tool_uses_runtime_alert_id_and_aggregates_context(monkeypatch
 
     assert result["ok"] is True
     assert result["alertId"] == alert_id
-    assert result["alert"]["aiAnalysis"]["summary"] == "Brute force confirmed"
-    assert result["alert"]["defaultParams"]["host"] == "10.0.0.25"
+    assert result["alert"] == payload
     assert fake_client.requested_urls == [alert_url]
 
 
@@ -141,4 +138,10 @@ def test_get_available_tools_includes_secops_workspace_tool_only_for_secops_agen
     default_names = [tool.name for tool in tools_module.get_available_tools(include_mcp=False, model_name="test-model", subagent_enabled=False, agent_name=None)]
 
     assert "get_alert_workspace_context" in secops_names
+    assert "update_alert_status" in secops_names
+    assert "get_mock_auth_user_context" in secops_names
+    assert "kick_mock_auth_user_sessions" in secops_names
+    assert "disable_mock_auth_user" in secops_names
     assert "get_alert_workspace_context" not in default_names
+    assert "update_alert_status" not in default_names
+    assert "get_mock_auth_user_context" not in default_names

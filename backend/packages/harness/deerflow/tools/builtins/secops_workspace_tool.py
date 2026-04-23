@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
@@ -16,6 +15,7 @@ SECOPS_BIZ_SERVICE_URL_ENV = "SECOPS_BIZ_SERVICE_URL"
 DEFAULT_SECOPS_BIZ_SERVICE_URL = "http://localhost:8080"
 DEFAULT_SECOPS_DOCKER_BIZ_SERVICE_URL = "http://host.docker.internal:8080"
 DEFAULT_HTTP_TIMEOUT_SECONDS = 10.0
+ALLOWED_ALERT_STATUSES = {"processing", "processed", "failed"}
 
 
 def _is_running_in_docker() -> bool:
@@ -46,26 +46,6 @@ def _resolve_alert_id(runtime: ToolRuntime[ContextT, ThreadState], alert_id: str
     return None
 
 
-def _parse_jsonish(value: Any) -> Any:
-    if value is None or value == "":
-        return None
-    if isinstance(value, (dict, list)):
-        return value
-    if isinstance(value, str):
-        try:
-            return json.loads(value)
-        except json.JSONDecodeError:
-            return value
-    return value
-
-
-def _normalize_alert(alert: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(alert)
-    normalized["aiAnalysis"] = _parse_jsonish(normalized.get("aiAnalysis"))
-    normalized["defaultParams"] = _parse_jsonish(normalized.get("defaultParams"))
-    return normalized
-
-
 def _format_http_error(prefix: str, error: Exception) -> str:
     if isinstance(error, httpx.HTTPStatusError):
         response = error.response
@@ -80,11 +60,38 @@ def fetch_alert_workspace_context(alert_id: str, *, base_url: str | None = None,
     with httpx.Client(timeout=timeout) as client:
         alert_response = client.get(alert_url)
         alert_response.raise_for_status()
-        alert = _normalize_alert(alert_response.json())
+        alert = alert_response.json()
 
     return {
         "ok": True,
         "alertId": str(alert_id),
+        "alert": alert,
+    }
+
+
+def patch_alert_status(
+    alert_id: str,
+    status: str,
+    *,
+    base_url: str | None = None,
+    timeout: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+) -> dict[str, Any]:
+    normalized_status = status.strip().lower()
+    if normalized_status not in ALLOWED_ALERT_STATUSES:
+        raise ValueError("status must be one of processing, processed, failed")
+
+    resolved_base_url = (base_url or _resolve_biz_service_base_url()).rstrip("/")
+    status_url = f"{resolved_base_url}/api/biz/alerts/{alert_id}/status"
+
+    with httpx.Client(timeout=timeout) as client:
+        response = client.patch(status_url, json={"status": normalized_status})
+        response.raise_for_status()
+        alert = response.json()
+
+    return {
+        "ok": True,
+        "alertId": str(alert_id),
+        "status": normalized_status,
         "alert": alert,
     }
 
@@ -97,7 +104,7 @@ def get_alert_workspace_context_tool(
     """Load the authoritative alert workspace context from SecOps biz-service.
 
     Use this tool when you need the latest persisted business data for the active alert.
-    It returns the alert detail, including parsed AI analysis and default params.
+    It returns the current alert detail from biz-service without local reshaping.
 
     Args:
         alert_id: Optional alert ID. If omitted, the tool uses the alert bound to the current thread context.
@@ -116,4 +123,41 @@ def get_alert_workspace_context_tool(
             "ok": False,
             "alertId": str(resolved_alert_id),
             "error": _format_http_error("Failed to load alert workspace context", error),
+        }
+
+
+@tool("update_alert_status", parse_docstring=True)
+def update_alert_status_tool(
+    runtime: ToolRuntime[ContextT, ThreadState],
+    status: str,
+    alert_id: str | None = None,
+) -> dict[str, Any]:
+    """Update the current alert status in SecOps biz-service.
+
+    Use this tool after an external action changes the remediation state.
+
+    Args:
+        status: One of processing, processed, failed.
+        alert_id: Optional alert ID. If omitted, the tool uses the alert bound to the current workspace thread.
+    """
+    resolved_alert_id = _resolve_alert_id(runtime, alert_id)
+    if resolved_alert_id is None:
+        return {
+            "ok": False,
+            "error": "Missing alert_id. Provide an explicit alert_id or run this tool inside a workspace thread already bound to an alert.",
+        }
+
+    try:
+        return patch_alert_status(resolved_alert_id, status)
+    except ValueError as error:
+        return {
+            "ok": False,
+            "alertId": str(resolved_alert_id),
+            "error": str(error),
+        }
+    except Exception as error:  # noqa: BLE001
+        return {
+            "ok": False,
+            "alertId": str(resolved_alert_id),
+            "error": _format_http_error("Failed to update alert status", error),
         }
