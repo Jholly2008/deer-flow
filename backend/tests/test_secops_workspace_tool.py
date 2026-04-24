@@ -142,6 +142,9 @@ def test_get_available_tools_includes_secops_workspace_tool_only_for_secops_agen
     assert "get_mock_auth_user_context" in secops_names
     assert "kick_mock_auth_user_sessions" in secops_names
     assert "disable_mock_auth_user" in secops_names
+    assert "create_mock_ticket" in secops_names
+    assert "get_mock_ticket_external_status" in secops_names
     assert "get_alert_workspace_context" not in default_names
     assert "update_alert_status" not in default_names
     assert "get_mock_auth_user_context" not in default_names
+    assert "create_mock_ticket" not in default_names

@@ -7,9 +7,11 @@ from deerflow.reflection import resolve_variable
 from deerflow.sandbox.security import is_host_bash_allowed
 from deerflow.tools.builtins import (
     ask_clarification_tool,
+    create_mock_ticket_tool,
     disable_mock_auth_user,
     get_alert_workspace_context_tool,
     get_mock_auth_user_context,
+    get_mock_ticket_external_status_tool,
     kick_mock_auth_user_sessions,
     present_file_tool,
     task_tool,
@@ -33,6 +35,8 @@ SECOPS_AGENT_TOOLS = [
     get_mock_auth_user_context,
     kick_mock_auth_user_sessions,
     disable_mock_auth_user,
+    create_mock_ticket_tool,
+    get_mock_ticket_external_status_tool,
 ]
 
 SUBAGENT_TOOLS = [
