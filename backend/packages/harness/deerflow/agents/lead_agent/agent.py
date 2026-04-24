@@ -34,6 +34,22 @@ def _build_agent_specific_middlewares(agent_name: str | None) -> list[AgentMiddl
     return middlewares
 
 
+def _resolve_runtime_config_value(
+    config: RunnableConfig,
+    key: str,
+    default: object | None = None,
+):
+    context = config.get("context", {})
+    if isinstance(context, dict) and context.get(key) is not None:
+        return context.get(key)
+
+    configurable = config.get("configurable", {})
+    if isinstance(configurable, dict) and configurable.get(key) is not None:
+        return configurable.get(key)
+
+    return default
+
+
 def _resolve_model_name(requested_model_name: str | None = None) -> str:
     """Resolve a runtime model name safely, falling back to default if invalid. Returns None if no models are configured."""
     app_config = get_app_config()
@@ -239,7 +255,7 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
         middlewares.append(summarization_middleware)
 
     # Add TodoList middleware if plan mode is enabled
-    is_plan_mode = config.get("configurable", {}).get("is_plan_mode", False)
+    is_plan_mode = bool(_resolve_runtime_config_value(config, "is_plan_mode", False))
     todo_list_middleware = _create_todo_list_middleware(is_plan_mode)
     if todo_list_middleware is not None:
         middlewares.append(todo_list_middleware)
@@ -268,9 +284,9 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
         middlewares.append(DeferredToolFilterMiddleware())
 
     # Add SubagentLimitMiddleware to truncate excess parallel task calls
-    subagent_enabled = config.get("configurable", {}).get("subagent_enabled", False)
+    subagent_enabled = bool(_resolve_runtime_config_value(config, "subagent_enabled", False))
     if subagent_enabled:
-        max_concurrent_subagents = config.get("configurable", {}).get("max_concurrent_subagents", 3)
+        max_concurrent_subagents = int(_resolve_runtime_config_value(config, "max_concurrent_subagents", 3))
         middlewares.append(SubagentLimitMiddleware(max_concurrent=max_concurrent_subagents))
 
     # LoopDetectionMiddleware — detect and break repetitive tool call loops
@@ -290,16 +306,14 @@ def make_lead_agent(config: RunnableConfig):
     from deerflow.tools import get_available_tools
     from deerflow.tools.builtins import setup_agent
 
-    cfg = config.get("configurable", {})
-
-    thinking_enabled = cfg.get("thinking_enabled", True)
-    reasoning_effort = cfg.get("reasoning_effort", None)
-    requested_model_name: str | None = cfg.get("model_name") or cfg.get("model")
-    is_plan_mode = cfg.get("is_plan_mode", False)
-    subagent_enabled = cfg.get("subagent_enabled", False)
-    max_concurrent_subagents = cfg.get("max_concurrent_subagents", 3)
-    is_bootstrap = cfg.get("is_bootstrap", False)
-    agent_name = validate_agent_name(cfg.get("agent_name"))
+    thinking_enabled = bool(_resolve_runtime_config_value(config, "thinking_enabled", True))
+    reasoning_effort = _resolve_runtime_config_value(config, "reasoning_effort", None)
+    requested_model_name: str | None = _resolve_runtime_config_value(config, "model_name") or _resolve_runtime_config_value(config, "model")
+    is_plan_mode = bool(_resolve_runtime_config_value(config, "is_plan_mode", False))
+    subagent_enabled = bool(_resolve_runtime_config_value(config, "subagent_enabled", False))
+    max_concurrent_subagents = int(_resolve_runtime_config_value(config, "max_concurrent_subagents", 3))
+    is_bootstrap = bool(_resolve_runtime_config_value(config, "is_bootstrap", False))
+    agent_name = validate_agent_name(_resolve_runtime_config_value(config, "agent_name"))
 
     agent_config = load_agent_config(agent_name) if not is_bootstrap else None
     # Custom agent model from agent config (if any), or None to let _resolve_model_name pick the default

@@ -77,7 +77,8 @@ def test_resolve_model_name_raises_when_no_models_configured(monkeypatch):
         lead_agent_module._resolve_model_name("missing-model")
 
 
-def test_make_lead_agent_disables_thinking_when_model_does_not_support_it(monkeypatch):
+@pytest.mark.parametrize("runtime_key", ["configurable", "context"])
+def test_make_lead_agent_disables_thinking_when_model_does_not_support_it(monkeypatch, runtime_key):
     app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
 
     import deerflow.tools as tools_module
@@ -99,7 +100,7 @@ def test_make_lead_agent_disables_thinking_when_model_does_not_support_it(monkey
 
     result = lead_agent_module.make_lead_agent(
         {
-            "configurable": {
+            runtime_key: {
                 "model_name": "safe-model",
                 "thinking_enabled": True,
                 "is_plan_mode": False,
@@ -160,7 +161,8 @@ def test_build_middlewares_uses_resolved_model_name_for_vision(monkeypatch):
     assert len(middlewares) > 0 and isinstance(middlewares[-2], MagicMock)
 
 
-def test_make_lead_agent_enables_secops_runtime_hooks(monkeypatch):
+@pytest.mark.parametrize("runtime_key", ["configurable", "context"])
+def test_make_lead_agent_enables_secops_runtime_hooks(monkeypatch, runtime_key):
     app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
 
     import deerflow.tools as tools_module
@@ -188,7 +190,7 @@ def test_make_lead_agent_enables_secops_runtime_hooks(monkeypatch):
 
     lead_agent_module.make_lead_agent(
         {
-            "configurable": {
+            runtime_key: {
                 "model_name": "safe-model",
                 "thinking_enabled": False,
                 "is_plan_mode": False,

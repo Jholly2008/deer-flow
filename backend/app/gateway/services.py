@@ -94,6 +94,26 @@ def normalize_input(raw_input: dict[str, Any] | None) -> dict[str, Any]:
     return raw_input
 
 
+def merge_request_context(
+    request_config: dict[str, Any] | None,
+    context: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Merge the top-level run ``context`` field into the request config."""
+    if request_config is None and context is None:
+        return None
+
+    merged: dict[str, Any] = dict(request_config or {})
+    if context is None:
+        return merged
+
+    existing_context = merged.get("context", {})
+    if not isinstance(existing_context, dict):
+        existing_context = {}
+
+    merged["context"] = {**existing_context, **context}
+    return merged
+
+
 _DEFAULT_ASSISTANT_ID = "lead_agent"
 
 
@@ -136,13 +156,17 @@ def build_run_config(
         # ``configurable`` and ``context``.  If the caller already sends
         # ``context``, honour it and skip our own ``configurable`` dict.
         if "context" in request_config:
+            context = request_config.get("context") or {}
+            if not isinstance(context, dict):
+                context = {}
             if "configurable" in request_config:
                 logger.warning(
                     "build_run_config: client sent both 'context' and 'configurable'; preferring 'context' (LangGraph >= 0.6.0). thread_id=%s, caller_configurable keys=%s",
                     thread_id,
                     list(request_config.get("configurable", {}).keys()),
                 )
-            config["context"] = request_config["context"]
+            context.setdefault("thread_id", thread_id)
+            config["context"] = context
         else:
             configurable = {"thread_id": thread_id}
             configurable.update(request_config.get("configurable", {}))
@@ -154,13 +178,19 @@ def build_run_config(
         config["configurable"] = {"thread_id": thread_id}
 
     # Inject custom agent name when the caller specified a non-default assistant.
-    # Honour an explicit configurable["agent_name"] in the request if already set.
-    if assistant_id and assistant_id != _DEFAULT_ASSISTANT_ID and "configurable" in config:
-        if "agent_name" not in config["configurable"]:
+    # Honour an explicit runtime agent_name in the request if already set.
+    runtime_config: dict[str, Any] | None = None
+    if isinstance(config.get("context"), dict):
+        runtime_config = config["context"]
+    elif isinstance(config.get("configurable"), dict):
+        runtime_config = config["configurable"]
+
+    if assistant_id and assistant_id != _DEFAULT_ASSISTANT_ID and runtime_config is not None:
+        if "agent_name" not in runtime_config:
             normalized = assistant_id.strip().lower().replace("_", "-")
             if not normalized or not re.fullmatch(r"[a-z0-9-]+", normalized):
                 raise ValueError(f"Invalid assistant_id {assistant_id!r}: must contain only letters, digits, and hyphens after normalization.")
-            config["configurable"]["agent_name"] = normalized
+            runtime_config["agent_name"] = normalized
     if metadata:
         config.setdefault("metadata", {}).update(metadata)
     return config
@@ -282,29 +312,8 @@ async def start_run(
 
     agent_factory = resolve_agent_factory(body.assistant_id)
     graph_input = normalize_input(body.input)
-    config = build_run_config(thread_id, body.config, body.metadata, assistant_id=body.assistant_id)
-
-    # Merge DeerFlow-specific context overrides into configurable.
-    # The ``context`` field is a custom extension for the langgraph-compat layer
-    # that carries agent configuration (model_name, thinking_enabled, etc.).
-    # Only agent-relevant keys are forwarded; unknown keys (e.g. thread_id) are ignored.
-    context = getattr(body, "context", None)
-    if context:
-        _CONTEXT_CONFIGURABLE_KEYS = {
-            "model_name",
-            "mode",
-            "thinking_enabled",
-            "reasoning_effort",
-            "is_plan_mode",
-            "subagent_enabled",
-            "max_concurrent_subagents",
-            "agent_name",
-            "is_bootstrap",
-        }
-        configurable = config.setdefault("configurable", {})
-        for key in _CONTEXT_CONFIGURABLE_KEYS:
-            if key in context:
-                configurable.setdefault(key, context[key])
+    request_config = merge_request_context(body.config, getattr(body, "context", None))
+    config = build_run_config(thread_id, request_config, body.metadata, assistant_id=body.assistant_id)
 
     stream_modes = normalize_stream_modes(body.stream_mode)
 
