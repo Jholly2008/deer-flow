@@ -8,13 +8,10 @@ SKILL_PATH = REPO_ROOT.parent / "skills" / "custom" / "secops" / "mock-illegal-l
 EXTERNAL_TICKET_SKILL_PATH = REPO_ROOT.parent / "skills" / "custom" / "secops" / "mock-external-ticket-responder" / "SKILL.md"
 
 
-def test_secops_agent_enables_both_demo_skills():
+def test_secops_agent_does_not_explicitly_restrict_skills():
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
 
-    assert config["skills"] == [
-        "mock-illegal-login-responder",
-        "mock-external-ticket-responder",
-    ]
+    assert "skills" not in config
 
 
 def test_mock_illegal_login_skill_documents_required_sop():
