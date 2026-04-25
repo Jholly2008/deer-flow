@@ -1,3 +1,7 @@
+from deerflow.utils.langchain_factory_compat import patch_langchain_factory_for_missing_ai_guard
+
+patch_langchain_factory_for_missing_ai_guard()
+
 from .checkpointer import get_checkpointer, make_checkpointer, reset_checkpointer
 from .factory import create_deerflow_agent
 from .features import Next, Prev, RuntimeFeatures
