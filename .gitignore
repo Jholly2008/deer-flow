@@ -40,7 +40,6 @@ backend/.deer-flow/*
 !backend/.deer-flow/agents/**
 backend/.deer-flow/agents/*/memory.json
 .claude/
-skills/custom/*
 logs/
 log/
 
