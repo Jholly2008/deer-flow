@@ -5,14 +5,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 IMAGE_REPO="${DEER_FLOW_IMAGE_REPO:-kkk2099/kkk}"
-IMAGE_VERSION="${DEER_FLOW_IMAGE_VERSION:-1.0.0}"
+IMAGE_VERSION_FILE="${DEER_FLOW_IMAGE_VERSION_FILE:-$REPO_ROOT/.image-version}"
+IMAGE_VERSION=""
 REGISTRY_SERVICES="${DEER_FLOW_REGISTRY_SERVICES:-frontend gateway langgraph}"
 
 usage() {
     cat <<EOF
 Usage:
   scripts/registry-deploy.sh release [--standard|--gateway]
-      Build with the native deploy script, tag images for Docker Hub, then push.
+      Build with the native deploy script, auto-bump patch version, tag images
+      for Docker Hub, then push.
 
   scripts/registry-deploy.sh build
       Build images with the native deploy script only.
@@ -38,14 +40,82 @@ Usage:
 
 Environment:
   DEER_FLOW_IMAGE_REPO       default: kkk2099/kkk
-  DEER_FLOW_IMAGE_VERSION    default: 1.0.0
+  DEER_FLOW_IMAGE_VERSION    exact version override
+  DEER_FLOW_IMAGE_VERSION_FILE default: .image-version
   DEER_FLOW_REGISTRY_SERVICES default: frontend gateway langgraph
 
 Examples:
+  scripts/registry-deploy.sh release
+  scripts/registry-deploy.sh up
   DEER_FLOW_IMAGE_VERSION=1.0.1 scripts/registry-deploy.sh release
-  DEER_FLOW_IMAGE_VERSION=1.0.1 scripts/registry-deploy.sh up
   DEER_FLOW_REGISTRY_SERVICES="frontend gateway langgraph provisioner" scripts/registry-deploy.sh release
 EOF
+}
+
+read_file_version() {
+    if [ -f "$IMAGE_VERSION_FILE" ]; then
+        tr -d '[:space:]' < "$IMAGE_VERSION_FILE"
+    else
+        printf '%s\n' "1.0.0"
+    fi
+}
+
+validate_version() {
+    local version="$1"
+    local old_ifs=$IFS
+    IFS=.
+    set -- $version
+    IFS=$old_ifs
+
+    [ "$#" -eq 3 ] || return 1
+    case "$1$2$3" in
+        ""|*[!0-9]*) return 1 ;;
+    esac
+}
+
+next_patch_version() {
+    local version="$1"
+    local old_ifs=$IFS
+    IFS=.
+    set -- $version
+    IFS=$old_ifs
+
+    printf '%s.%s.%s\n' "$1" "$2" "$(($3 + 1))"
+}
+
+resolve_image_version() {
+    if [ -n "${DEER_FLOW_IMAGE_VERSION:-}" ]; then
+        printf '%s\n' "$DEER_FLOW_IMAGE_VERSION"
+    else
+        read_file_version
+    fi
+}
+
+resolve_release_version() {
+    if [ -n "${DEER_FLOW_IMAGE_VERSION:-}" ]; then
+        printf '%s\n' "$DEER_FLOW_IMAGE_VERSION"
+    else
+        next_patch_version "$(read_file_version)"
+    fi
+}
+
+set_image_version() {
+    IMAGE_VERSION="$1"
+    validate_version "$IMAGE_VERSION" || {
+        echo "Invalid DEER_FLOW_IMAGE_VERSION: $IMAGE_VERSION" >&2
+        exit 1
+    }
+    export DEER_FLOW_IMAGE_REPO="$IMAGE_REPO"
+    export DEER_FLOW_IMAGE_VERSION="$IMAGE_VERSION"
+}
+
+write_image_version() {
+    local version="$1"
+    validate_version "$version" || {
+        echo "Invalid DEER_FLOW_IMAGE_VERSION: $version" >&2
+        exit 1
+    }
+    printf '%s\n' "$version" > "$IMAGE_VERSION_FILE"
 }
 
 local_image() {
@@ -94,11 +164,17 @@ case "$mode_arg" in
 esac
 
 cd "$REPO_ROOT"
+set_image_version "$(resolve_image_version)"
 
 case "${1:-}" in
     release)
+        release_version="$(resolve_release_version)"
+        set_image_version "$release_version"
+        echo "Releasing DeerFlow image version: $IMAGE_VERSION"
         "$REPO_ROOT/scripts/deploy.sh" build
         push_images
+        write_image_version "$IMAGE_VERSION"
+        echo "Updated $IMAGE_VERSION_FILE to $IMAGE_VERSION"
         ;;
     build)
         "$REPO_ROOT/scripts/deploy.sh" build
