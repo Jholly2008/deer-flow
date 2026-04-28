@@ -9,6 +9,7 @@ IMAGE_VERSION_OVERRIDE="${DEER_FLOW_IMAGE_VERSION:-}"
 IMAGE_VERSION_FILE="${DEER_FLOW_IMAGE_VERSION_FILE:-$REPO_ROOT/.image-version}"
 IMAGE_VERSION=""
 REGISTRY_SERVICES="${DEER_FLOW_REGISTRY_SERVICES:-frontend gateway langgraph}"
+AUTO_GIT="${DEER_FLOW_RELEASE_GIT:-1}"
 
 usage() {
     cat <<EOF
@@ -44,6 +45,7 @@ Environment:
   DEER_FLOW_IMAGE_VERSION    exact version override
   DEER_FLOW_IMAGE_VERSION_FILE default: .image-version
   DEER_FLOW_REGISTRY_SERVICES default: frontend gateway langgraph
+  DEER_FLOW_RELEASE_GIT      commit and push .image-version after release, default: 1
 
 Examples:
   scripts/registry-deploy.sh release
@@ -119,6 +121,40 @@ write_image_version() {
     printf '%s\n' "$version" > "$IMAGE_VERSION_FILE"
 }
 
+sync_release_branch() {
+    if [ "$AUTO_GIT" = "0" ]; then
+        echo "Skipped git pull because DEER_FLOW_RELEASE_GIT=0"
+        return
+    fi
+
+    if ! command -v git >/dev/null 2>&1; then
+        echo "git is required to sync $IMAGE_VERSION_FILE before release" >&2
+        exit 1
+    fi
+
+    git pull --ff-only
+}
+
+commit_and_push_version() {
+    if [ "$AUTO_GIT" = "0" ]; then
+        echo "Skipped git commit/push because DEER_FLOW_RELEASE_GIT=0"
+        return
+    fi
+
+    if ! command -v git >/dev/null 2>&1; then
+        echo "git is required to persist $IMAGE_VERSION_FILE after release" >&2
+        exit 1
+    fi
+
+    git add -- "$IMAGE_VERSION_FILE"
+    if git diff --cached --quiet -- "$IMAGE_VERSION_FILE"; then
+        echo "No image version changes to commit"
+        return
+    fi
+    git commit --only "$IMAGE_VERSION_FILE" -m "Bump DeerFlow image version to $IMAGE_VERSION"
+    git push
+}
+
 local_image() {
     printf 'deer-flow-%s' "$1"
 }
@@ -169,6 +205,7 @@ set_image_version "$(resolve_image_version)"
 
 case "${1:-}" in
     release)
+        sync_release_branch
         release_version="$(resolve_release_version)"
         set_image_version "$release_version"
         echo "Releasing DeerFlow image version: $IMAGE_VERSION"
@@ -176,6 +213,7 @@ case "${1:-}" in
         push_images
         write_image_version "$IMAGE_VERSION"
         echo "Updated $IMAGE_VERSION_FILE to $IMAGE_VERSION"
+        commit_and_push_version
         ;;
     build)
         "$REPO_ROOT/scripts/deploy.sh" build
