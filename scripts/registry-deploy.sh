@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 IMAGE_REPO="${DEER_FLOW_IMAGE_REPO:-kkk2099/kkk}"
+IMAGE_VERSION_OVERRIDE="${DEER_FLOW_IMAGE_VERSION:-}"
 IMAGE_VERSION_FILE="${DEER_FLOW_IMAGE_VERSION_FILE:-$REPO_ROOT/.image-version}"
 IMAGE_VERSION=""
 REGISTRY_SERVICES="${DEER_FLOW_REGISTRY_SERVICES:-frontend gateway langgraph}"
@@ -84,16 +85,16 @@ next_patch_version() {
 }
 
 resolve_image_version() {
-    if [ -n "${DEER_FLOW_IMAGE_VERSION:-}" ]; then
-        printf '%s\n' "$DEER_FLOW_IMAGE_VERSION"
+    if [ -n "$IMAGE_VERSION_OVERRIDE" ]; then
+        printf '%s\n' "$IMAGE_VERSION_OVERRIDE"
     else
         read_file_version
     fi
 }
 
 resolve_release_version() {
-    if [ -n "${DEER_FLOW_IMAGE_VERSION:-}" ]; then
-        printf '%s\n' "$DEER_FLOW_IMAGE_VERSION"
+    if [ -n "$IMAGE_VERSION_OVERRIDE" ]; then
+        printf '%s\n' "$IMAGE_VERSION_OVERRIDE"
     else
         next_patch_version "$(read_file_version)"
     fi
