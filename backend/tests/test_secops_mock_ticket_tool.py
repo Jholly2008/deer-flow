@@ -132,3 +132,12 @@ def test_get_mock_ticket_external_status_reads_mock_backend(monkeypatch):
     assert result["ok"] is True
     assert result["status"] == "success"
     assert result["payload"]["ticketId"] == "MT-1"
+
+
+def test_resolve_mock_backend_base_url_prefers_secops_published_port_inside_container(monkeypatch):
+    monkeypatch.delenv(ticket_tool_module.SECOPS_MOCK_BACKEND_URL_ENV, raising=False)
+    monkeypatch.setattr(ticket_tool_module, "_is_running_in_docker", lambda: True)
+
+    result = ticket_tool_module._resolve_mock_backend_base_url()
+
+    assert result == "http://host.docker.internal:18082"

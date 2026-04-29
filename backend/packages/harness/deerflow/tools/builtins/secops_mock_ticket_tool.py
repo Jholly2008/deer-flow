@@ -20,7 +20,7 @@ from deerflow.tools.builtins.secops_workspace_tool import (
 
 SECOPS_MOCK_BACKEND_URL_ENV = "SECOPS_MOCK_BACKEND_URL"
 DEFAULT_SECOPS_MOCK_BACKEND_URL = "http://localhost:8082"
-DEFAULT_SECOPS_DOCKER_MOCK_BACKEND_URL = "http://host.docker.internal:8082"
+DEFAULT_SECOPS_DOCKER_MOCK_BACKEND_URL = "http://host.docker.internal:18082"
 
 
 def _is_running_in_docker() -> bool:

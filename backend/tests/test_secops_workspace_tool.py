@@ -118,7 +118,7 @@ def test_resolve_biz_service_base_url_prefers_docker_host_inside_container(monke
 
     result = workspace_tool_module._resolve_biz_service_base_url()
 
-    assert result == workspace_tool_module.DEFAULT_SECOPS_DOCKER_BIZ_SERVICE_URL
+    assert result == "http://host.docker.internal:18083"
 
 
 def test_get_available_tools_includes_secops_workspace_tool_only_for_secops_agent(monkeypatch):

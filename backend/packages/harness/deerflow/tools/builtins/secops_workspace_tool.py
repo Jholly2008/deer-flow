@@ -13,7 +13,7 @@ from deerflow.agents.thread_state import ThreadState
 
 SECOPS_BIZ_SERVICE_URL_ENV = "SECOPS_BIZ_SERVICE_URL"
 DEFAULT_SECOPS_BIZ_SERVICE_URL = "http://localhost:8080"
-DEFAULT_SECOPS_DOCKER_BIZ_SERVICE_URL = "http://host.docker.internal:8080"
+DEFAULT_SECOPS_DOCKER_BIZ_SERVICE_URL = "http://host.docker.internal:18083"
 DEFAULT_HTTP_TIMEOUT_SECONDS = 10.0
 ALLOWED_ALERT_STATUSES = {"processing", "processed", "failed"}
 

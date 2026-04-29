@@ -142,3 +142,12 @@ def test_disable_mock_auth_user_returns_final_disabled_state(monkeypatch):
 
     assert result["ok"] is True
     assert result["disabled"] is True
+
+
+def test_resolve_mock_auth_base_url_prefers_secops_published_port_inside_container(monkeypatch):
+    monkeypatch.delenv(mock_auth_tool_module.SECOPS_MOCK_BACKEND_URL_ENV, raising=False)
+    monkeypatch.setattr(mock_auth_tool_module, "_is_running_in_docker", lambda: True)
+
+    result = mock_auth_tool_module._resolve_mock_backend_base_url()
+
+    assert result == "http://host.docker.internal:18082"
