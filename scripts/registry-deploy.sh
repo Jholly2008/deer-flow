@@ -121,6 +121,29 @@ write_image_version() {
     printf '%s\n' "$version" > "$IMAGE_VERSION_FILE"
 }
 
+ensure_env_file() {
+    local target="$1"
+    local source="$2"
+
+    if [ -f "$target" ]; then
+        return
+    fi
+
+    if [ ! -f "$source" ]; then
+        echo "Missing required env file: $target" >&2
+        echo "Template not found: $source" >&2
+        exit 1
+    fi
+
+    cp "$source" "$target"
+    echo "Created $target from $source"
+}
+
+ensure_runtime_env_files() {
+    ensure_env_file "$REPO_ROOT/.env" "$REPO_ROOT/.env.example"
+    ensure_env_file "$REPO_ROOT/frontend/.env" "$REPO_ROOT/frontend/.env.example"
+}
+
 sync_release_branch() {
     if [ "$AUTO_GIT" = "0" ]; then
         echo "Skipped git pull because DEER_FLOW_RELEASE_GIT=0"
@@ -209,6 +232,7 @@ case "${1:-}" in
         release_version="$(resolve_release_version)"
         set_image_version "$release_version"
         echo "Releasing DeerFlow image version: $IMAGE_VERSION"
+        ensure_runtime_env_files
         "$REPO_ROOT/scripts/deploy.sh" build
         push_images
         write_image_version "$IMAGE_VERSION"
@@ -216,6 +240,7 @@ case "${1:-}" in
         commit_and_push_version
         ;;
     build)
+        ensure_runtime_env_files
         "$REPO_ROOT/scripts/deploy.sh" build
         ;;
     push)
@@ -226,12 +251,15 @@ case "${1:-}" in
         ;;
     up)
         pull_images
+        ensure_runtime_env_files
         "$REPO_ROOT/scripts/deploy.sh" start ${mode_arg:---standard}
         ;;
     start)
+        ensure_runtime_env_files
         "$REPO_ROOT/scripts/deploy.sh" start ${mode_arg:---standard}
         ;;
     down)
+        ensure_runtime_env_files
         "$REPO_ROOT/scripts/deploy.sh" down
         ;;
     images)
