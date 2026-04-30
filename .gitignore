@@ -42,6 +42,7 @@ backend/.deer-flow/agents/*/memory.json
 .claude/
 logs/
 log/
+debug.log
 
 # Local git hooks (keep only on this machine, do not push)
 .githooks/

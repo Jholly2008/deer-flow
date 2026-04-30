@@ -2,12 +2,12 @@ from deerflow.utils.langchain_factory_compat import patch_langchain_factory_for_
 
 patch_langchain_factory_for_missing_ai_guard()
 
-from .checkpointer import get_checkpointer, make_checkpointer, reset_checkpointer
 from .factory import create_deerflow_agent
 from .features import Next, Prev, RuntimeFeatures
 from .lead_agent import make_lead_agent
 from .lead_agent.prompt import prime_enabled_skills_cache
 from .thread_state import SandboxState, ThreadState
+from deerflow.runtime.checkpointer import get_checkpointer, make_checkpointer, reset_checkpointer
 
 # LangGraph imports deerflow.agents when registering the graph. Prime the
 # enabled-skills cache here so the request path can usually read a warm cache

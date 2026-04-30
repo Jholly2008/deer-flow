@@ -3,6 +3,7 @@ import logging
 from langchain.tools import BaseTool
 
 from deerflow.config import get_app_config
+from deerflow.config.app_config import AppConfig
 from deerflow.reflection import resolve_variable
 from deerflow.sandbox.security import is_host_bash_allowed
 from deerflow.tools.builtins import (
@@ -62,6 +63,8 @@ def get_available_tools(
     model_name: str | None = None,
     subagent_enabled: bool = False,
     agent_name: str | None = None,
+    *,
+    app_config: AppConfig | None = None,
 ) -> list[BaseTool]:
     """Get all available tools from config.
 
@@ -77,7 +80,7 @@ def get_available_tools(
     Returns:
         List of available tools.
     """
-    config = get_app_config()
+    config = app_config or get_app_config()
     tool_configs = [tool for tool in config.tools if groups is None or tool.group in groups]
 
     # Do not expose host bash by default when LocalSandboxProvider is active.
